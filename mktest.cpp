@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <cmath>
 #include "mkl.h"
-#include "mktest.h"
+#include "mktest.hpp"
 #include "hdf5.h"
 #include "hdf5_hl.h"
 #include <time.h>
@@ -27,49 +27,37 @@ int main()
 
   string *snpname,*genename;
   bool *cistrans;
-  
-  int m, n, p, i, j;
-  int bsi;
-  double alpha, beta;
-  double colmean=0;
-  double colsd=0;
+
+
   double mindist= 100000;
-  ifstream snpfile;
-  ifstream expfile;
-  string line,ts;
+  hid_t filespace,dset_id;
+  hsize_t* cordims;
 
-  hid_t file_id,dset_id;
-  hid_t filespace,memspace;
-  hsize_t dimsf[3];
+  //file parameters
+  char corfilename[]="/home/nwk2/mkl_test/testcor.nc";
+  char snpfilename[]="/scratch/nwk2/hdf5/testsnp.h5";
+  char genefilename[]="/scratch/nwk2/hdf5/testexp.h5";
 
-  herr_t status;
+  int casetotal = 177;
+  int snptotal = 906598;
+  int genetotal = 20501;
 
-  char filename[]="/home/nwk2/mkl_test/testcor.nc";
+  int snpstart=0;
+  int snpend=200;
+  int casestart=0;
+  int caseend=20;
+  int genestart=0;
+  int geneend=100;
 
+  //Parameters for matrix multiplication using dgemm
+  alpha = 1.0; beta = 0.0;  
+
+  
+  
   
 
   srand(time(0));
- 
   
-  m = 20, p = 81, n = 10,bsi=4;
-  dimsf[0]=m;
-  dimsf[1]=n;
-  dimsf[2]=bsi;
-  file_id = H5Fcreate (filename,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
-  filespace = H5Screate_simple(3,dimsf,NULL);
-  
-  dset_id = H5Dcreate2(file_id,"DoubleArray",H5T_NATIVE_DOUBLE,filespace,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
-  H5Sclose(filespace);
-
-
-  printf (" Initializing data for matrix multiplication C=Snpmat*Expmat for matrix \n"
-	  " Snpmat(%ix%i) and matrix Expmat(%ix%i)\n\n", m, p, p, n);
-  alpha = 1.0; beta = 0.0;
-  
-  printf (" Allocating memory for matrices aligned on 64-byte boundary for better \n"
-	  " performance \n\n");
-  
-  //  cistrans = (bool *)mkl_malloc(n*m*sizeof(bool),64);
 
   
   C = (double *)mkl_malloc( m*n*sizeof( double ), 64 );
@@ -79,13 +67,14 @@ int main()
 
   printf (" Intializing matrix data \n\n");
   
-  readmatrix(Snpmat,p,m,"/scratch/nwk2/hdf5/testsnp.txt");
-  readmatrix(Expmat,p,n,"/scratch/nwk2/hdf5/testexp.txt");
+  readmatrix(Snpmat,casetotal,snptotal,casestart,caseend,snpstart,snpend,snpfilename,SNP);
+  readmatrix(Expmat,casetotal,genetotal,casestsart,caseend,genestart,geneend,genefilename,GENE);
 
   //readanno(snpname,snpchr,snppos,NULL,m,"/home/nwk2/mkl_test/snpanno.txt");
   //readanno(genename,genechr,genestart,geneend,m,"/scratch/nwk2/mkl_test/expanno.txt");
   /* Let's establish cis and trans relationships now*/
   /*
+  //  cistrans = (bool *)mkl_malloc(n*m*sizeof(bool),64);
     for(i=0; i<m; i++){
     for(j=0; j<n; j++){
     cistrans[index(i,j,m)]=(snpchr[i]==genechr[j])&&((abs(snppos[i]-genestart[j])<mindist)||(abs(snppos[i]-geneend[j])<mindist));
