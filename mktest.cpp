@@ -1,12 +1,10 @@
 /* C source code is found in dgemm_example.c */
 
-#include <fstream>
-#include <string>
+
 #include <iostream>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
-#include <cmath>
 #include "mkl.h"
 #include "mktest.hpp"
 #include "hdf5.h"
@@ -23,97 +21,178 @@ int main()
 {
   double *Snpmat=NULL, *Expmat=NULL, *C=NULL;
   double *BootSNP=NULL, *BootExp=NULL;
-  int *snpchr,*snppos,*genechr,*genestart,*geneend;
-
+  
+  //annotation parameters
+  int *snparray,*genearray;  
   string *snpname,*genename;
   bool *cistrans;
-
-
   double mindist= 100000;
-  hid_t filespace,dset_id;
-  hsize_t* cordims;
+
+  
+  //Matrices and temporary vectors for reporting and storing quantiles
+  double *quantiles;
+  double *tquantile,*bootmatrix;
+  
+  
+
 
   //file parameters
-  char corfilename[]="/home/nwk2/mkl_test/testcor.nc";
-  char snpfilename[]="/scratch/nwk2/hdf5/testsnp.h5";
-  char genefilename[]="/scratch/nwk2/hdf5/testexp.h5";
-
+  char annofilename[]="/scratch/nwk2/hdf5/snpgeneanno.h5";
+  char corfilename[]="/tmp/nwk2/testcor.h5";
+  char snpgenefilename[]="/scratch/nwk2/hdf5/snpgenemat_BRCAN.h5";
+  
+  // Platform data/case numbers
   int casetotal = 177;
   int snptotal = 906598;
   int genetotal = 20501;
 
-  int snpstart=0;
-  int snpend=200;
-  int casestart=0;
-  int caseend=20;
-  int genestart=0;
-  int geneend=100;
+  //variables for profiling
+  double s_initial_boot,s_elapsed_boot;
+  double s_initial_mult, s_elapsed_mult;
+  double s_initial_write,s_elapsed_write;
+
+  int mysnpstart=0;
+  int mysnpend=10;
+  int mycasestart=0;
+  int mycaseend=5;
+  int mygenestart=0;
+  int mygeneend=5;
+  int bsi = 5;
+  
+  int snpsize = (mysnpend-mysnpstart)+1;
+  int genesize= (mygeneend-mygenestart)+1;
+  int casesize = (mycaseend-mycasestart)+1;
 
   //Parameters for matrix multiplication using dgemm
-  alpha = 1.0; beta = 0.0;  
+  int alpha = 1.0/((double)casesize), beta = 0.0;  
 
-  
-  
+  VSLStreamStatePtr stream;
+  VSLSSTaskPtr snptask,genetask;
+  MKL_INT x_storage=VSL_SS_MATRIX_STORAGE_ROWS;
+  unsigned MKL_INT estimate;
+  int errcode;
+  hid_t file, dataset,filespace;
+  hsize_t cordims[3]={snpsize,genesize,bsi};
+  double* snpmeans,*snpvariances,*genemeans,*genevariances,*snp2r,*gene2r;
   
 
-  srand(time(0));
-  
-
-  
-  C = (double *)mkl_malloc( m*n*sizeof( double ), 64 );
-  for (i = 0; i < (m*n); i++) {
+  C = (double *)mkl_malloc( snpsize*genesize*sizeof( double ), 64 );
+  for (int i = 0; i < (snpsize*genesize); i++) {
     C[i] = 0.0;
   }
+  readmatrix(Expmat,casetotal,genetotal,mycasestart,mycaseend,mygenestart,mygeneend,snpgenefilename,"genes");  
+  readmatrix(Snpmat,casetotal,snptotal,mycasestart,mycaseend,mysnpstart,mysnpend,snpgenefilename,"snps");
 
-  printf (" Intializing matrix data \n\n");
+
   
-  readmatrix(Snpmat,casetotal,snptotal,casestart,caseend,snpstart,snpend,snpfilename,SNP);
-  readmatrix(Expmat,casetotal,genetotal,casestsart,caseend,genestart,geneend,genefilename,GENE);
-
-  //readanno(snpname,snpchr,snppos,NULL,m,"/home/nwk2/mkl_test/snpanno.txt");
-  //readanno(genename,genechr,genestart,geneend,m,"/scratch/nwk2/mkl_test/expanno.txt");
-  /* Let's establish cis and trans relationships now*/
-  /*
-  //  cistrans = (bool *)mkl_malloc(n*m*sizeof(bool),64);
-    for(i=0; i<m; i++){
-    for(j=0; j<n; j++){
-    cistrans[index(i,j,m)]=(snpchr[i]==genechr[j])&&((abs(snppos[i]-genestart[j])<mindist)||(abs(snppos[i]-geneend[j])<mindist));
-    if(cistrans[index(i,j,m)])
-    {
-    cout<<"Cis found!"<<snpname[i]<<" "<<genename[j]<<endl;
-    }
-    }
-    }
-  */
+  file = H5Fcreate(corfilename,H5F_ACC_RDWR,H5P_DEFAULT,H5P_DEFAULT);
+  filespace = H5Screate_simple(3,cordims,NULL);
+  dataset = H5Dcreate2(file,"cor",H5T_NATIVE_DOUBLE,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
   
 
+  //Bootstrapping loop
+  //Initialize Bootstrap Matrices
+  BootSNP= (double *) mkl_malloc(rowsize*snpsize*sizeof(double),64);
+  BootExp= (double *) mkl_malloc(rowsize*genesize*sizeof(double),64);
+  
+  snpmeans = (double*) mkl_malloc(snpsize*sizeof(double),64);
+  genemeans = (double*) mkl_malloc(genesize*sizeof(double),64);
+
+  snpvariances = (double*) mkl_malloc(snpsize*sizeof(double),64);
+  genevariances = (double*) mkl_malloc(genesize*sizeof(double),64);
+
+  snp2r = (double*) mkl_malloc(snpsize*sizeof(double),64);
+  gene2r = (double*) mkl_malloc(genesize*sizeof(double),64);
+
+  
+  
+  errcode = vslNewStream(&stream,VSL_BRNG_MCG31,123);
+  errcode = vsldSSNewTask(&snptask,&snpsize,&casesize,&x_storage,BootSNP,0,0);
+  errcode = vsldSSEditTask(snptask,VSL_SS_ED_2R_MOM,snp2r);
+  errcode = vsldSSEditTask(snptask,VSL_SS_ED_2C_MOM,snpvariances);
+  errcode = vsldSSEditTask(snptask,VSL_SS_ED_MEAN,snpmeans);
+
+
+
+  errcode = vsldSSNewTask(&genetask,&genesize,&casesize,&x_storage,BootExp,0,0);
+  errcode = vsldSSEditTask(genetask,VSL_SS_ED_2R_MOM,gene2r);
+  errcode = vsldSSEditTask(genetask,VSL_SS_ED_2C_MOM,genevariances);
+  errcode = vsldSSEditTask(genetask,VSL_SS_ED_MEAN,genemeans);
+
+  estimate = VSL_SS_MEAN|VSL_SS_2R_MOM|VSL_SS_2C_MOM;
+
+
+
+
+  s_elapsed_boot=0;
+  s_elapsed_mult=0;
+  s_elapsed_write=0;
   for( int q=0; q<bsi; q++){
-    bootstrap(BootSNP,BootExp,Snpmat,Expmat,p,m,n,q);
-    scale(BootSNP,p,m);
-    scale(BootExp,p,n);
+    cout<<"BSI:"<<q<<endl;
+    s_initial_boot=dsecnd();
+    DoBootstrap(BootSNP,BootExp,Snpmat,Expmat,casesize,snpsize,genesize,q,stream);
+    vsldSSCompute(snptask,estimate,VSL_SS_METHOD_FAST);
+    vdSqrt(snpsize,snpvariances,snpvariances,NULL);
+    vdSqrt(genesize,genevariances,genevariances,NULL);
+    vsldSSCompute(genetask,estimate,VSL_SS_METHOD_FAST);
+    Scale(BootSNP,casesize,snpsize,snpmeans,snpvariances);
+    Scale(BootExp,casesize,genesize,genemeans,genevariances);
+    s_elapsed_boot+=(dsecnd()-s_initial_boot);
+    s_initial_mult=dsecnd();
+    //printf (" Computing matrix product using Intel® MKL dgemm function via CBLAS interface \n\n");
+    cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, snpsize, genesize, casesize, (1.0/(double) casesize), BootSNP, snpsize, BootExp, genesize, beta, C, genesize);
+    s_elapsed_mult+=(dsecnd()-s_initial_mult);
+    //printf ("\n Computations completed.\n\n");
     
-    printf (" Computing matrix product using Intel® MKL dgemm function via CBLAS interface \n\n");
-    cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 
-		m, n, p, (1.0/(double) p), BootSNP, m, BootExp, n, beta, C, n);
-    printf ("\n Computations completed.\n\n");
-    
-    writemat(C,m,n,filespace,dset_id,q);
+    s_initial_write=dsecnd();
+    WriteMat(C,mysnpstart,mysnpend,mygenestart,mygeneend,q,file,dataset);
+    s_elapsed_write+=(dsecnd()-s_initial_write);
   }
-  printf ("\n Top left corner of matrix C: \n");
-  for (i=0; i<10; i++) {
-    for (j=0; j<10; j++) {
-      printf ("%0.6f\t", C[index(i,j,n)]/p);
-      
-    }
-    printf ("\n");
-  }
+
+  status = H5Dclose(dataset);
+  status = H5Sclose(filespace);
+  status = H5Fclose(file);
+  cout<<"Bootstrap time: "<<s_elapsed_boot<<endl;
+  cout<<"Mult time: "<<s_elapsed_mult<<endl;
+  cout<<"Write time: "<<s_elapsed_write<<endl;
   
   
-  printf ("\n Deallocating memory \n\n");
+  //printf ("\n Deallocating memory \n\n");
   mkl_free(Snpmat);
   mkl_free(Expmat);
+  mkl_free(BootSNP);
+  mkl_free(BootExp);
   mkl_free(C);
   
-  printf (" Example completed. \n\n");
+  cordims[3]=2;
+
+  file = H5Dcreate(annofilename,H5F_ACC_RDWR,H5P_DEFAULT,H5P_DEFAULT);
+  filespace = H5Screate_simple(3,cordims,NULL);
+  dataset = H5Dcreate2(file,"quantiles",H5T_NATIVE_DOUBLE,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
+
+  lowquantiles = (double*)mkl_malloc(snpsize*genesize*sizeof(double),64);
+  highquantiles = (double*)mkl_malloc(snpsize*genesize*sizeof(double),64);
+
+
+  for(int i=0; i<genesize; i++)
+    {
+      GetSlice(corfilename,mysnpstart,i,0,snpsize,1,bsi,bootmatrix);
+      GetQuantile(bootmatrix,snpsize,bsi,tquantile);
+      cblas_dcopy(snpsize,tquantile,2,&lowquantiles[index(0,i,genesize)],genesize);
+      cblas_dcopy(snpsize,&tquantile[1],2,&highquantiles[index(1,i,genesize)],genesize);
+    }
+  WriteMat(lowquantiles,snpstart,snpend,genestart,geneend,0,dataset,filespace);
+  WriteMat(highquantiles,snpstart,snpend,genestart,geneend,1,dataset,filespace);
+  
+  status = H5Dclose(dataset);
+  status = H5Sclose(filespace);
+  status = H5Fclose(file);  
+
+  
+      
+
+  //Start Computing quantiles for correlation
+  
+  //printf (" Example completed. \n\n");
   return 0;
 }

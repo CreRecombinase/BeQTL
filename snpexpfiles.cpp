@@ -23,8 +23,7 @@ int main(int argc, char* argv[])
   char snpname[]="/scratch/nwk2/hdf5/snpmat_BRCAN.txt";
   char expname[]="/scratch/nwk2/hdf5/expmat_BRCAN.txt";
 
-  char snph5[]="/scratch/nwk2/hdf5/snpmat_BRCAN.h5";
-  char exph5[]="/scratch/nwk2/hdf5/expmat_BRCAN.h5";
+  char snpexph5[]="/scratch/nwk2/hdf5/snpexpmat_BRCAN.h5";
   rows = 177;
   snps = 906598;
   genes = 20501;
@@ -75,22 +74,22 @@ int main(int argc, char* argv[])
 
   hsize_t snpmatsize[2]={rows,snps};
   hsize_t expmatsize[2]={rows,genes};
-  hid_t snp_id,exp_id;
+  hid_t file_id;
   hid_t snpdataspace;
   hid_t expdataspace;
   hid_t snpdataset,expdataset;
   herr_t status;
 
-  snp_id = H5Fcreate (snph5,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
-  exp_id = H5Fcreate (exph5, H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
+  file_id = H5Fcreate (snpexph5,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
+
 
 
   snpdataspace = H5Screate_simple(2,snpmatsize,NULL);
   expdataspace = H5Screate_simple(2,expmatsize,NULL);
 
 
-  snpdataset = H5Dcreate2(snp_id,"snps",H5T_NATIVE_DOUBLE,snpdataspace,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
-  expdataset = H5Dcreate2(exp_id,"genes",H5T_NATIVE_DOUBLE,expdataspace,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
+  snpdataset = H5Dcreate2(file_id,"snps",H5T_NATIVE_DOUBLE,snpdataspace,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
+  expdataset = H5Dcreate2(file_id,"genes",H5T_NATIVE_DOUBLE,expdataspace,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
   
 
   status = H5Dwrite( snpdataset,H5T_NATIVE_DOUBLE,H5S_ALL,H5S_ALL,H5P_DEFAULT,snpmat);
@@ -103,9 +102,7 @@ int main(int argc, char* argv[])
 
   H5Dclose(snpdataset);
   H5Dclose(expdataset);
-
-  H5Fclose(snp_id);
-  H5Fclose(exp_id);
+  H5Fclose(file_id);
 
   free(snpmat);
   free(expmat);
