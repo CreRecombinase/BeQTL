@@ -25,6 +25,7 @@ void PrintMat(const double *matrix,int r,int c)
 	}
       cout<<"\n";
     }
+    cout<<"____________________"<<endl;
 }
 
 
@@ -33,8 +34,8 @@ void DoScale(double *&matrix,int rows,int cols,double means[],double variances[]
   
   for(int i=0; i<rows; i++)
     {
-  vdSub(cols,&matrix[index(i,0,c)],means,&matrix[index(i,0,c)]);
-  vdDiv(cols,&matrix[index(i,0,c)],variances,&matrix[index(i,0,c)]);
+  vdSub(cols,&matrix[index(i,0,cols)],means,&matrix[index(i,0,cols)]);
+  vdDiv(cols,&matrix[index(i,0,cols)],variances,&matrix[index(i,0,cols)]);
     }
 
 }
@@ -85,10 +86,6 @@ void GetSlice(const char* filename,int rowstart,int colstart,int bsistart,int ro
   status = H5Fclose(file);
 }
 
-  
-
-  
-}
 
 void ReadMatrix(double *&matrix,int rtot,int ctot,int rstart,int rend, int cstart, int cend,const char* filename,const char* snpgene)
 {
@@ -217,8 +214,9 @@ void WriteMat(double matrix[],int rowstart,int rowend, int colstart,int colend,i
   hsize_t offset[3]={rowstart,colstart,bsindex};
   hid_t memspace = H5Screate_simple(3,slabsize,NULL);
   herr_t status;
-  
+  cout<<"about to select hyperslab"<<endl;
   H5Sselect_hyperslab(filespace,H5S_SELECT_SET,offset,NULL,slabsize,NULL);
+  cout<<"hyperslab selected"<<endl;
 
   plist_xfer=H5Pcreate(H5P_DATASET_XFER);
   H5Pset_buffer(plist_xfer,(hsize_t)rowsize*(hsize_t)colsize,NULL,NULL);
