@@ -3,19 +3,28 @@
 #include <string>
 #include "hdf5.h"
 #include <math.h>
+#include "mkl.h"
 #include "hdf5_hl.h"
 
-bool debug=true;
+bool debug=false;
 using namespace std;
 enum snp_exp {SNP,GENE};
 
-int index (int i, int j, int M)
+int index (int row, int column, int nocols)
+//Function for indexing 2 dimensional, row major order array
+//row     row index
+//column  column index
+//nocols  number of columns
 {
-  //row first indexing
-  return((M*i)+j);
+ 
+  return((nocols*row)+column);
 }
 
 void PrintMat(const double *matrix,int r,int c)
+//Function for printing 2D, row order array
+//*matrix   pointer to head of matrix
+//r         number of rows
+//c         number of columns
 {
   for(int i=0;i<r;i++)
     {
@@ -29,9 +38,40 @@ void PrintMat(const double *matrix,int r,int c)
 }
 
 
-void DoScale(double *&matrix,int rows,int cols,double means[],double variances[])
+void DoScale(double *&matrix,int rows,int cols)
+/*Function to perform scaling on the columns of the matrix such that the rows have a mean of 0 and unit variance
+Scaling is performed by subtracting the column means and then dividing by the square root of the variance (the standard deviation)
+
+matrix     pointer to head of array
+rows       number of rows
+cols       number of columns
+ */
 {
+  VSLSSTaskPtr task;
+  MKL_INT x_storage=VSL_SS_MATRIX_STORAGE_COLS;
+  unsigned MKL_INT estimate;
+  double *means,*variances,*secondraw;
+  int errcode;
+
+  means = (double*) mkl_malloc(cols*sizeof(double),64);
+  variances = (double*)mkl_malloc(cols*sizeof(double),64);
+  secondraw = (double*)mkl_malloc(cols*sizeof(double),64);
   
+
+  errcode = vsldSSNewTask(&task,&cols,&rows,&x_storage,matrix,0,0);
+  errcode = vsldSSEditTask(task,VSL_SS_ED_2R_MOM,secondraw);
+  errcode = vsldSSEditTask(task,VSL_SS_ED_2C_MOM,variances);
+  errcode = vsldSSEditTask(task,VSL_SS_ED_MEAN,means);
+
+    estimate = VSL_SS_MEAN|VSL_SS_2R_MOM|VSL_SS_2C_MOM;
+  errcode = vsldSSCompute(task,estimate,VSL_SS_METHOD_FAST);
+  
+  vdSqrt(cols,variances,variances);
+  if(debug)
+    {
+      PrintMat(means,1,cols);
+      PrintMat(variances,1,cols);
+    }
   for(int i=0; i<rows; i++)
     {
   vdSub(cols,&matrix[index(i,0,cols)],means,&matrix[index(i,0,cols)]);
@@ -40,22 +80,40 @@ void DoScale(double *&matrix,int rows,int cols,double means[],double variances[]
 
 }
 
-void DoBootstrap(double *&bootsnpmatrix,double *&bootexpmatrix, const double osnpmatrix[], const double oexpmatrix[], int rowsize, int snpsize, int genesize,int bs,VSLStreamStatePtr stream)
+void MakeBootRows(int *&bootrows, int rowsize,int bstotal)
+//Function to geneerate 2d array of bootstrap rows
 {
-  int* bootcols;
+  VSLStreamStatePtr stream;
+  int errcode;
+  
+  bootrows = (int*) mkl_malloc(rowsize*bstotal*sizeof(int),64);
+  errcode = vslNewStream(&stream,VSL_BRNG_MCG31,123);
+  errcode = viRngUniform(VSL_RNG_METHOD_UNIFORM_STD,stream,rowsize*bstotal,bootrows,0,rowsize);
+
+}
+
+void DoBootstrap(double *&bootmatrix,const double* omatrix,int rowsize, int colsize,int* bootrows)
+/*Function that takes original array and array to be filled and fills it according to rows as specified in array of colums
+*/
+{
+
 
   int errcode;
   
-  bootcols = (int*)mkl_malloc(rowsize*sizeof(int),64);
-  errcode = viRngUniform(VSL_RNG_METHOD_UNIFORM_STD,stream,rowsize,bootcols,0,rowsize-1);
+
+  if(debug)
+    {
+      for(int i=0; i<rowsize; i++)
+	{
+	  bootrows[i]=i;
+	}
+    }
   
     //Let's fill in bootstnp
     for(int i=0; i<rowsize; i++)
       {
-	cblas_dcopy(snpsize,&osnpmatrix[index(bootcols[i],0,snpsize)],1,&bootsnpmatrix[index(i,0,snpsize)],1);
-	cblas_dcopy(genesize,&oexpmatrix[index(bootcols[i],0,genesize)],1,&bootexpmatrix[index(i,0,genesize)],1);
+	cblas_dcopy(colsize,&omatrix[index(bootrows[i],0,colsize)],1,&bootmatrix[index(i,0,colsize)],1);
       }
-    mkl_free(bootcols);
    
 }
 
@@ -70,7 +128,7 @@ void GetSlice(const char* filename,int rowstart,int colstart,int bsistart,int ro
   hid_t dataset,dataspace,filespace,memspace;
   herr_t status;
 
-  matrix = (double *) mkl_malloc(rownum*colnum*bsinum*sizeof(double),64);
+  //  matrix = (double *) mkl_malloc(rownum*colnum*bsinum*sizeof(double),64);
   file = H5Fopen(filename,H5F_ACC_RDONLY,H5P_DEFAULT);
   dataset = H5Dopen2(file,"cor",H5P_DEFAULT);
   dataspace = H5Dget_space(dataset);
@@ -214,9 +272,9 @@ void WriteMat(double matrix[],int rowstart,int rowend, int colstart,int colend,i
   hsize_t offset[3]={rowstart,colstart,bsindex};
   hid_t memspace = H5Screate_simple(3,slabsize,NULL);
   herr_t status;
-  cout<<"about to select hyperslab"<<endl;
+
   H5Sselect_hyperslab(filespace,H5S_SELECT_SET,offset,NULL,slabsize,NULL);
-  cout<<"hyperslab selected"<<endl;
+
 
   plist_xfer=H5Pcreate(H5P_DATASET_XFER);
   H5Pset_buffer(plist_xfer,(hsize_t)rowsize*(hsize_t)colsize,NULL,NULL);
@@ -245,7 +303,6 @@ void WriteMat(double matrix[],int rowstart,int rowend, int colstart,int colend,i
   unsigned MKL_INT64 estimate=0;
   int dim=1;
   int n=rows*cols;
-  quantiles = (double*)mkl_malloc(cols*2*sizeof(double),64);
 
   status = vsldSSNewTask( &task,&cols,&rows,&x_storage,(double*)matrix,NULL,NULL);
  
@@ -255,6 +312,20 @@ void WriteMat(double matrix[],int rowstart,int rowend, int colstart,int colend,i
 
 
   
+}
+
+void TestGenerate(double *&matrix, int rowsize,int colsize,int zindex)
+//Create a 2d test array for the rest of the functions
+{
+  matrix = (double*)mkl_malloc(rowsize*colsize*sizeof(double),64);
+  
+  for(int i=0; i<rowsize;i++)
+    {
+      for(int j=0; j<colsize;j++)
+	{
+	  matrix[index(i,j,colsize)]=(double)i+(double)j*0.1+(double)zindex*0.01;
+	}
+    }
 }
 
 #endif
