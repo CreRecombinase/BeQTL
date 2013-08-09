@@ -20,7 +20,7 @@ int main()
   char snpannofile[]="/home/nwk2/mkl_test/snpanno.txt";
   char geneannofile[]="/home/nwk2/mkl_test/geneanno.txt";
 
-  char outsnpfile[]="/home/nwk2/mkl_test/snpexpanno.h5";
+  char outsnpfile[]="/scratch/nwk2/hdf5/snpgeneanno.h5";
 
   
   int snpsize=906598;

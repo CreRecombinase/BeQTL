@@ -1,23 +1,29 @@
 #ifndef MKTEST_HPP
 #define MKTEST_HPP
 #include <string>
+#include <fstream>
 #include "hdf5.h"
 #include <math.h>
 #include "mkl.h"
 #include "hdf5_hl.h"
 #include <sys/file.h>
-#include <omp.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+
 
 bool debug=false;
 using namespace std;
 enum snp_exp {SNP,GENE};
 
-int multindex(int row,int column,int zindex,int nrows,int ncols)
+size_t multindex(size_t row,size_t column,size_t zindex,size_t nrows,size_t ncols,size_t zsize)
 {
-  return((nrows*ncols*zindex)+(ncols*row)+column);
+  return(row*(ncols*zsize)+(zsize*column)+zindex);
 }
 
-int index (int row, int column, int nocols)
+size_t index (size_t row, size_t column, size_t nocols)
 //Function for indexing 2 dimensional, row major order array
 //row     row index
 //column  column index
@@ -27,7 +33,40 @@ int index (int row, int column, int nocols)
   return((nocols*row)+column);
 }
 
+void PrintMat(const double *matrix,int r,int c, const char* filename)
+{
+  ofstream file;
+  file.open(filename,ofstream::out);
+  for(int i=0;i<r;i++)
+    {
+      for(int j=0;j<c;j++)
+	{
+	  file<<matrix[index(i,j,c)]<<"\t";
+	}
+      file<<"\n";
+    }
+  file.close();
+  //    cout<<"____________________"<<endl;
+}
+
 void PrintMat(const double *matrix,int r,int c)
+//Function for printing 2D, row order array
+//*matrix   pointer to head of matrix
+//r         number of rows
+//c         number of columns
+{
+  for(int i=0;i<r;i++)
+    {
+      for(int j=0;j<c;j++)
+	{
+	  cout<<matrix[index(i,j,c)]<<"\t";
+	}
+      cout<<"\n";
+    }
+    cout<<"____________________"<<endl;
+}
+
+void PrintMat(const int *matrix,int r,int c)
 //Function for printing 2D, row order array
 //*matrix   pointer to head of matrix
 //r         number of rows
@@ -75,16 +114,14 @@ cols       number of columns
   errcode = vslSSDeleteTask(&task);
   
   vdSqrt(cols,variances,variances);
-  if(debug)
-    {
-      PrintMat(means,1,cols);
-      PrintMat(variances,1,cols);
-    }
   for(int i=0; i<rows; i++)
     {
   vdSub(cols,&matrix[index(i,0,cols)],means,&matrix[index(i,0,cols)]);
   vdDiv(cols,&matrix[index(i,0,cols)],variances,&matrix[index(i,0,cols)]);
     }
+  mkl_free(means);
+  mkl_free(variances);
+  mkl_free(secondraw);
 
 }
 
@@ -94,9 +131,12 @@ void MakeBootRows(int *&bootrows, int rowsize,int bstotal)
   VSLStreamStatePtr stream;
   int errcode;
   
-  bootrows = (int*) mkl_malloc(rowsize*bstotal*sizeof(int),64);
+  bootrows = (int*) mkl_malloc((size_t)rowsize*(size_t)bstotal*sizeof(int),64);
   errcode = vslNewStream(&stream,VSL_BRNG_MCG31,123);
   errcode = viRngUniform(VSL_RNG_METHOD_UNIFORM_STD,stream,rowsize*bstotal,bootrows,0,rowsize);
+  errcode = vslDeleteStream(&stream);
+
+  
 
 }
 
@@ -109,20 +149,53 @@ void DoBootstrap(double *&bootmatrix,const double* omatrix,int rowsize, int cols
   int errcode;
   
 
-  if(debug)
+    if(debug)
     {
       for(int i=0; i<rowsize; i++)
 	{
 	  bootrows[i]=i;
 	}
     }
-  
+    
+
+	
     //Let's fill in bootstnp
     for(int i=0; i<rowsize; i++)
       {
-	cblas_dcopy(colsize,&omatrix[index(bootrows[i],0,colsize)],1,&bootmatrix[index(i,0,colsize)],1);
+	errcode = bootrows[i];
+	
+	cblas_dcopy(colsize,&omatrix[index(errcode,0,colsize)],1,&bootmatrix[index(i,0,colsize)],1);
       }
+      
    
+}
+
+void printProgBar(int percent){
+  char bar[50];
+  
+  for(int i=0; i<50; i++)
+    {
+      if(i<(percent/2))
+	{
+	  bar[i]='=';
+
+	}
+      else 
+	{
+	  if (i==(percent/2))
+	    {
+	      bar[i]='>';
+
+	    }
+	  else
+	    {
+	      bar[i]=' ';
+	    }
+	}
+    }
+  cout<<"\r" "["<<bar<<"] ";
+  cout.width(3);
+  cout<<percent<<"%     "<<flush;
 }
 
 void MatSlice(double *&slicemat, double *&omat,int colstart,int colsize,int rowsize, int zsize)
@@ -130,8 +203,8 @@ void MatSlice(double *&slicemat, double *&omat,int colstart,int colsize,int rows
 {
   for(int i=0; i<zsize; i++)
     {
-      //      cout<<omp_get_thread_num()<<endl;
-      cblas_dcopy(rowsize,&omat[multindex(0,colstart,i,rowsize,colsize)],colsize,&slicemat[index(0,i,zsize)],zsize);
+
+      cblas_dcopy(rowsize,&omat[multindex(0,colstart,i,rowsize,colsize,zsize)],colsize,&slicemat[index(0,i,zsize)],zsize);
     }
 }
 
@@ -148,8 +221,6 @@ herr_t GetSlice(int rowstart,int colstart,int bsistart,int rownum, int colnum,in
   hid_t memspace;
   herr_t status;
 
-  //  matrix = (double *) mkl_malloc(rownum*colnum*bsinum*sizeof(double),64);
-
 
   status = H5Sselect_hyperslab(dataspace,H5S_SELECT_SET,offset,NULL,slabsize,NULL);
   
@@ -165,22 +236,28 @@ herr_t GetSlice(int rowstart,int colstart,int bsistart,int rownum, int colnum,in
 
 herr_t ReadMatrix(double *&matrix,int rtot,int ctot,int rstart,int rsize, int cstart, int csize,const char* filename,const char* snpgene,const char*lockfile)
 {
+  struct stat buffer;
   hid_t dataspace,file,dataset,rank,memspace;
   herr_t status;
-  int result=-1;
-  int fd=-1;
+  FILE * fp;
   hsize_t dimsout[2]={rsize,csize};
   hsize_t offset[2]={rstart,cstart};
   hsize_t offset_out[2] ={0,0};
   hsize_t dimsm[2] ={rsize,csize};
+
+   
   
   matrix = (double *)mkl_malloc(rsize*csize*sizeof(double),64);
-  while(fd<0|result<0)
+  
+  //  cout<<"obtaining file lock"<<endl;
+  while(stat(lockfile,&buffer)==0)
     {
-      fd = open(lockfile,O_RDONLY);
-
-      result = flock(fd,LOCK_EX);
+      usleep(999999);
+      cout<<lockfile<<" exists!"<<endl;
     }
+  fp = fopen(lockfile,"ab+");
+  
+  //  cout<<"file lock obtained"<<endl;
 
   file  = H5Fopen(filename,H5F_ACC_RDONLY,H5P_DEFAULT);
   dataset = H5Dopen2(file,snpgene,H5P_DEFAULT);
@@ -196,9 +273,10 @@ herr_t ReadMatrix(double *&matrix,int rtot,int ctot,int rstart,int rsize, int cs
   status = H5Dclose(dataset);
   status = H5Sclose(dataspace);
   status = H5Fclose(file);
-  
-  result = flock(fd,LOCK_UN);
-  close(fd);
+
+  fclose(fp);
+  remove(lockfile);
+
   return(status);
 
 
@@ -206,14 +284,12 @@ herr_t ReadMatrix(double *&matrix,int rtot,int ctot,int rstart,int rsize, int cs
 
 }
 
-void ReadAnno (string name[], int array[], int numstart,int numend, const char* filename,int arraydim)
+void ReadAnno (char **&name, int *&array, int numstart,int numsize,const char* filename,int arraydim)
 {
   
-  int numsize = (numend-numstart)+1;
   hid_t dataspacename,dataspacearray,file_id,datasetname,datasetarray,rank,memspacename,memspacearray;
   hid_t fstrtype;
   hid_t mstrtype;
-  name = new string[numsize];
   hsize_t offsetname[1]={numstart};
   hsize_t offsetarray[2]={numstart,0};
   hsize_t dimsarray[2]={numsize,arraydim};
@@ -223,7 +299,8 @@ void ReadAnno (string name[], int array[], int numstart,int numend, const char* 
   herr_t status;
   
   
-  array = (int *)malloc(arraydim*numsize*sizeof(int));
+  array = (int *)mkl_malloc(arraydim*numsize*sizeof(int),64);
+  name = (char**)mkl_malloc(numsize*sizeof(char*),64);
   
   file_id = H5Fopen(filename,H5F_ACC_RDONLY,H5P_DEFAULT);
   if(arraydim==2)
@@ -269,59 +346,9 @@ void ReadAnno (string name[], int array[], int numstart,int numend, const char* 
 
 }
 
-herr_t WriteMat(double matrix[],int rowstart,int rowsize, int colstart,int colsize,int rowtotal,int coltotal,const char* filename,int snpchunk,const char* writefilelock)
-{
-
-  hid_t file,filespace,dataset;
-  hsize_t space_dims[3]={rowtotal,coltotal,2};
-  int wlockf=-1;
-  int result=-1;
-  hid_t plist_xfer;
-  hsize_t slabsize[3]={rowsize,colsize,2};
-  hsize_t offset[3]={rowstart,colstart,0};
-  hid_t memspace = H5Screate_simple(3,slabsize,NULL);
-  herr_t status;
-
-  while(wlockf<0|result<0)
-    {
-      wlockf=open(writefilelock,O_RDONLY);
-      result=flock(wlockf,LOCK_EX);
-    }
-  
-  if(snpchunk==0)
-    {
-      file=H5Fcreate(filename,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
-      filespace = H5Screate_simple(3,space_dims,NULL); 
-      dataset= H5Dcreate(file,"quantiles",H5T_NATIVE_DOUBLE,filespace,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
-    }
-  else{
-    file = H5Fopen(filename,H5F_ACC_RDWR,H5P_DEFAULT);
-    dataset = H5Dopen(file,"quantiles",H5P_DEFAULT);
-    filespace = H5Dget_space(dataset);
-  }
 
 
-  H5Sselect_hyperslab(filespace,H5S_SELECT_SET,offset,NULL,slabsize,NULL);
-
-
-  plist_xfer=H5Pcreate(H5P_DATASET_XFER);
-  H5Pset_buffer(plist_xfer,(hsize_t)rowsize*(hsize_t)colsize,NULL,NULL);
-  status=H5Dwrite(dataset,H5T_NATIVE_DOUBLE,memspace,filespace,plist_xfer,matrix);
-  H5Sclose(memspace);
-
-  status = H5Dclose(dataset);
-  status = H5Sclose(filespace);
-  status = H5Fclose(file);  
-
-  result=flock(wlockf,LOCK_UN);
-  result=close(wlockf);
-  return(status);
-
-}
-
-
-
-void GetQuantile(double *&matrix, int rowsize,int colsize, int bootsize,double *&quantiles)
+void GetQuantile(double *&matrix, size_t rowsize,size_t colsize, size_t bootsize,double *&quantiles)
 {
 
   int deciles = 2;
@@ -330,8 +357,8 @@ void GetQuantile(double *&matrix, int rowsize,int colsize, int bootsize,double *
   double variation[colsize*rowsize];
   double mean[colsize*rowsize];
   double r2[colsize*rowsize];
-  double o_quant[2]={0.05,0.95};
-  //  double quantiles[cols*2];
+  double o_quant[2]={0.025,0.975};
+
   double o_stat[colsize*rowsize*bootsize];
   MKL_INT x_storage =VSL_SS_MATRIX_STORAGE_COLS;
   MKL_INT o_storage = VSL_SS_MATRIX_STORAGE_ROWS;
@@ -341,30 +368,34 @@ void GetQuantile(double *&matrix, int rowsize,int colsize, int bootsize,double *
   
 
   status = vsldSSNewTask( &task,&p,&n,&x_storage,(double*)matrix,NULL,NULL);
- 
+
 
   status = vsldSSEditQuantiles(task,&deciles,o_quant,(double*)quantiles,(double*)o_stat,&o_storage);
+
   status = vsldSSCompute(task,VSL_SS_QUANTS,VSL_SS_METHOD_FAST);
+
   status = vslSSDeleteTask(&task);
+
 
 
 
   
 }
 
-void TestGenerate(double *matrix, int rowsize,int colsize,int colstart,int zindex)
+double* TestGenerate(double *&matrix, int rowsize,int colsize,int rowstart, int colstart,int zindex)
 //Create a 2d test array for the rest of the functions
 { 
   for(int i=0; i<rowsize;i++)
     {
       for(int j=0; j<colsize;j++)
 	{
-	  matrix[index(i,j,colsize)]=(double)i+((double) colstart+(double)j*0.1)+(double)zindex*0.01;
+	  matrix[index(i,j,colsize)]=((double) rowstart+(double)i)+((double) colstart+(double)j*0.1)+(double)zindex*0.01;
 	}
     }
+  return(matrix);
 }
 
-bool isCis(const double* snparray,const double* genearray,int snp,int gene,int cisdist)
+bool isCis(const int* snparray,const int* genearray,int snp,int gene,int cisdist)
 {
   int snpchr = snparray[index(snp,0,2)];
   int snppos = snparray[index(snp,1,2)];
@@ -372,89 +403,118 @@ bool isCis(const double* snparray,const double* genearray,int snp,int gene,int c
   int genestart = genearray[index(gene,1,3)];
   int geneend = genearray[index(gene,2,3)];
   
-  return( (snpchr==genechr)&((abs(snppos-genestart)<cisdist)|(abs(snppos-geneend)<cisdist)));
+  return( (snpchr==genechr)&&((abs(snppos-genestart)<cisdist)||(abs(snppos-geneend)<cisdist)));
   
 }
-void cistransout (const double *tmatrix,int snpsize,int genesize, const double* snparray,const double* genearray, const string  *snpnames,const string *genenames,double t_thresh,const char*cisfile,const char* transfile,int cisdist)
+void CisTransOut (const double *quantilearray,const int snpstart,const int snpsize,const int genestart,const int genesize, const int casesize,const int zsize,const char *annofile,double t_thresh,const char*cisfile,const char* transfile,int cisdist,const char* lockfile,int mychunk,const char* progfile)
   
 {
-  FILE* cis,*trans;
+
+  struct stat buffer;
+  int status;
+  FILE* fp;
+  ofstream cis,trans,prog;
+  double cor1,cor2,worstcor;
+  double cordenom;
+  int *snparray,*genearray;
+  char** snpnames,**genenames;
+
+  while(stat(lockfile,&buffer)==0)
+    {
+      usleep(9999);
+      cout<<lockfile<<" exists!"<<endl;
+    }
+  fp = fopen(lockfile,"ab+");
+
+  ReadAnno(snpnames,snparray,snpstart,snpsize,annofile,2);
+  ReadAnno(genenames,genearray,genestart,genesize,annofile,3);
   
-  cis = fopen(cisfile,"w");
-  trans = fopen(transfile,"w");
+  cordenom = sqrt(casesize-2);
+
+
+  prog.open(progfile,ofstream::out|ofstream::app);
+  prog<<mychunk<<endl;
+  cis.open(cisfile,ofstream::out|ofstream::app);
+  trans.open(transfile,ofstream::out|ofstream::app);
+  if(mychunk==0){
+    cis<<"SNP\tGene\tt-stat1\tt-stat2"<<endl;
+    trans<<"SNP\tGene\tt-stat1\tt-stat2"<<endl;
+  }
   
   for(int i=0; i<snpsize; i++)
     {
       for(int j=0; j<genesize; j++)
 	{
-	  if(abs(tmatrix[index(i,j,genesize)])>t_thresh)
+	  cor1=quantilearray[multindex(i,j,0,snpsize,genesize,zsize)];
+	  cor1=cordenom*(cor1/sqrt(1-(cor1*cor1)));
+	  cor2=quantilearray[multindex(i,j,1,snpsize,genesize,zsize)];
+	  cor2=cordenom*(cor2/sqrt(1-(cor2*cor2)));
+	  worstcor = fabs(cor1)>fabs(cor2) ? cor2 : cor1;
+	  //	  cout<<snpnames[i]<<"-"<<genenames[j]<<": "<<fabs(worstcor)<<" "<<t_thresh<<endl;
+	  
+
+	  if(fabs(worstcor)>t_thresh && ((cor1<0)==(cor2<0))&&((!isnan(cor1))&&(!isnan(cor2))))
 	    {
 	      if(isCis(snparray,genearray,i,j,cisdist))
 		{
-		  cis<<snpnames[i]<<"\t"<<genenames[j]<<"\t"<<tmatrix[index(i,j,genesize)];
+		  cis<<snpnames[i]<<"\t"<<genenames[j]<<"\t"<<cor1<<"\t"<<cor2<<endl;
 		}
 	      else
 		{
-		  trans<<snpnames[i]<<"\t"<<genenames[j]<<"\t"<<tmatrix[index(i,j,genesize)];
+		  trans<<snpnames[i]<<"\t"<<genenames[j]<<"\t"<<cor1<<"\t"<<cor2<<endl;
 		}
 	    }
 	}
-    }	  
+    } 
 
-  fclose(trans);
-  fclose(cis);
+  prog.close();
+  trans.close();
+  cis.close();
+  fclose(fp);
+  remove(lockfile);
+
 }
 
 
-void worstT (double *&matrix,const double* corarray,int rowsize,int colsize,int samplesize,double *tmat)		
-//Calcuate t stat for correlation bootstrap and return the 'worst' of the two t-stats
+
+
+
+
+void readparam(hid_t file_id, const char* attributename,char*&attributevalue)
 {
+  hid_t root,att;
+  hid_t fstrtype;
 
-  double tempt1,tempt2;
-  double tcorr;
-  double tr;
-  tcorr = sqrt(samplesize-2);
-  matrix = (double*)mkl_malloc(rowsize*colsize*sizeof(double),64);
+  root=H5Gopen(file_id,"/",H5P_DEFAULT);
+  fstrtype= H5Tcopy(H5T_C_S1);
+  H5Tset_size(fstrtype,H5T_VARIABLE);
+  att=H5Aopen_name(root,attributename);
+  H5Aread(att,fstrtype,&attributevalue);
+  H5Gclose(root);
+  H5Aclose(att);
+}
+	  
+void readparam(hid_t file_id,const char* attributename,int&attributevalue)
+{
+  hid_t root,att;
+  hid_t fstrtype;
   
-  for(int i=0; i<rowsize; i++)
-    {
-      for(int j=0; j<colsize; j++)
-	{
-	  tr = corarray[multindex(i,j,0,rowsize,colsize)];
-	  tempt1=tcorr*(tr/sqrt(1-(tr*tr)));
-	  tr = corarray[multindex(i,j,1,rowsize,colsize)];
-	  tempt2=tcorr*(tr/sqrt(1-(tr*tr)));
-	  if(tempt1>0&tempt2>0)
-	    {
-	      if(tempt1>tempt2)
-		{
-		  matrix[index(i,j,colsize)]=tempt2;
-		}
-	      else
-		{
-		  matrix[index(i,j,colsize)]=tempt1;
-		}
-	    }
-	  else
-	    {
-	      if(tempt1<0&tempt2<0)
-		{
-		  if(tempt1>tempt2)
-		    {
-		      matrix[index(i,j,colsize)]=tempt1;
-		    }
-		  else
-		    {
-		      matrix[index(i,j,colsize)]=tempt2;
-		    }
-		}
-	      else
-		{
-		  matrix[index(i,j,colsize)]=0;
-		}
-	    }
-	}
-    }
+  root = H5Gopen(file_id,"/",H5P_DEFAULT);
+  att=H5Aopen_name(root,attributename);
+  H5Aread(att,H5T_NATIVE_INT,&attributevalue);
+  H5Gclose(root);
+  H5Aclose(att);
 }
 
+void readparam(hid_t file_id,const char* attributename,double&attributevalue)
+{
+  hid_t root,att;
+  hid_t fstrtype;
+  
+  root = H5Gopen(file_id,"/",H5P_DEFAULT);
+  att=H5Aopen_name(root,attributename);
+  H5Aread(att,H5T_NATIVE_DOUBLE,&attributevalue);
+  H5Gclose(root);
+  H5Aclose(att);
+}
 #endif
