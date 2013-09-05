@@ -1,5 +1,5 @@
 library(sqldf)
-#usage CleanDatasets.R SNPfile GENEfile SNPanno GENEanno NewSNPfile NewGENEfile
+#usage CleanDatasets.R SNPfile GENEfile SNPanno GENEanno NewSNPfile NewGENEfile snpcut genecut
 oargs <- commandArgs(trailingOnly=T)
 args <- list()
 
@@ -9,6 +9,8 @@ args$SNPanno <- oargs[[3]]
 args$Geneanno <- oargs[[4]]
 args$NewSNPfile <- oargs[[5]]
 args$NewGENEfile <- oargs[[6]]
+args$snpcut <- as.numeric(oargs[[7]])
+args$genecut <- as.numeric(oargs[[8]])
 
 snpdata <- read.csv.sql(args$SNPfile,sep="\t",header=T,eol="\n")
 genedata <- read.csv.sql(args$GENEfile,sep="\t",header=T,eol="\n")
@@ -37,6 +39,17 @@ geneanno <- geneanno[geneanno[,1] %in% rownames(genedata),]
 
 snpdata <- snpdata[snpanno[,1],]
 geneanno <- genedata[geneanno[,1],]
+
+snpcount <- apply(snpdata,1,function(x)sum(sort(tabulate(x+1),decreasing=T)[-1]))
+snpcount <- snpcount/ncol(snpdata)
+
+snpdata <- snpdata[snpcount>args$snpcut,]
+
+genecount <- apply(genedata,1,function(x)sum(x>0))
+genecount <- genecount/ncol(genedata);
+
+genedata <- genedata[genecount>args$genecut,]
+                  
 
 write.table(snpdata,args$NewSNPfile,sep="\t",col.names=T,row.names=T,quote=F)
 write.table(genedata,args$NewGENEfile,sep="\t",col.names=T,row.names=T,quote=F)
