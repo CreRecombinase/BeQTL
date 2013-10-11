@@ -130,12 +130,13 @@ void readanno (string name[], int chr[], int posstart[], int end[], int num, con
 }
 
 
-void initfile(const char* filename,int snptotal,int genetotal,int bsi, hsize_t* cordims,hid_t* filespace, hid_t* dset_id)
+void initfile(const char* filename,int snptotal,int genetotal,int bsi, hsize_t& cordims,hid_t& filespace, hid_t& dset_id)
 {
   hid_t file_id;
 
   file_id = H5Fcreate (filename,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
 
+  dimsf = (hsize_t*)mkl_malloc(
 
   dimsf[0]=m;
   dimsf[1]=n;
