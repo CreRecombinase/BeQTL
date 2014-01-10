@@ -207,6 +207,7 @@ void GetQuantile(double *&matrix, size_t rowsize,size_t colsize, size_t bootsize
     status = vsldSSCompute(task,VSL_SS_QUANTS,VSL_SS_METHOD_FAST);
 
     status = vslSSDeleteTask(&task);
+    mkl_free(o_stat);
   }
 
 
@@ -226,52 +227,4 @@ void TestGenerate(double *matrix, size_t rowsize,size_t colsize,size_t rowstart,
     }
 
 }
-
-double quantile(double *sarray, double quantile, size_t size,size_t skipsize)
-{
-  double pos=quantile*size;
-
-
-  if(ceilf(pos)==pos)
-    {
-      return(sarray[(int)(pos)*skipsize]);
-    }
-  else
-    {
-      double fpos = sarray[(int)floor(pos)*skipsize];
-      double cpos = sarray[(int)ceil(pos)*skipsize];
-
-      return(fpos+((cpos-fpos))*(pos-floor(pos)));
-    }
-}
-
-void quantile2 (double *&matrix, size_t rowsize, size_t colsize, size_t bootsize, double *&quantiles)
-{
-  size_t skipsize = rowsize*colsize;
-  
-  for(size_t i=0; i<skipsize;i++)
-    {
-      unsigned percent=(((double) i)/((double) skipsize))*100;
-      printProgBar(percent);
-      stride_iter<double*> Cstart(matrix+i,skipsize);
-      stride_iter<double*> Cend(matrix+(i+(skipsize*(bootsize-1))),skipsize);
-      sort(Cstart,Cend);
-      quantiles[i*3]=quantile(matrix+i,0.025,bootsize,skipsize);
-      quantiles[(i*3)+1]=quantile(matrix+i,0.5,bootsize,skipsize);
-      quantiles[(i*3)+2]=quantile(matrix+i,0.975,bootsize,skipsize);
-    }
-}
-  
-  
-
-
-
-
-  
-
-
-
-
-
-
 #endif

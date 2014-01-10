@@ -19,18 +19,25 @@ struct cmp_str
   }
 };
 
-
-bool isCis(const int* snparray,const int* genearray,int snp,int gene,int cisdist)
+//Return Distance instead of a boolean
+int CisDist(const int* snparray,const int* genearray,int snp,int gene)
 {
   int snpchr = snparray[index(snp,0,2)];
   int snppos = snparray[index(snp,1,2)];
   int genechr = genearray[index(gene,0,3)];
   int genestart = genearray[index(gene,1,3)];
   int geneend = genearray[index(gene,2,3)];
-  
+  if(snpchr!=genechr)
+    {
+      return(-1);
+    }
+  return(min(abs(snppos-genestart),abs(snppos-geneend)));
+}
+/*  
   return( (snpchr==genechr)&&((abs(snppos-genestart)<cisdist)||(abs(snppos-geneend)<cisdist)));
   
 }
+*/
 
 
 void PrintMat(const double *matrix,int r,int c, const char* filename)
@@ -281,14 +288,15 @@ map<char*,int,cmp_str> ReadAnno(const char* annofile,const int totalnum, const c
 
 
 
-void CisTransOut (const double *quantilearray,const int snpstart,const int snpsize,const int genestart,const int genesize, const int casesize,const int zsize,const char *annofile,double t_thresh,const char*cisfile,const char* transfile,int cisdist,int mychunk,const char* progfile,map<char*,int,cmp_str>snpanno, map<char*,int,cmp_str> geneanno, const int *snparray, const int *genearray, const char* snpgenefile)
+void CisTransOut (const double *quantilearray,const int snpstart,const int snpsize,const int genestart,const int genesize, const int casesize,const int zsize,const char *annofile,double t_thresh,const char* eqtlfile,int mychunk,const char* progfile,map<char*,int,cmp_str>snpanno, map<char*,int,cmp_str> geneanno, const int *snparray, const int *genearray, const char* snpgenefile)
   
 {
   
   struct stat buffer;
   int status;
+  int cisdist;
   FILE* fp;
-  ofstream cis,trans,prog;
+  ofstream eqtl,prog;
   double cor1,cor2,cor3;
   double cordenom;
 
@@ -305,11 +313,9 @@ void CisTransOut (const double *quantilearray,const int snpstart,const int snpsi
   
   prog.open(progfile,ofstream::out|ofstream::app);
   prog<<mychunk<<"\t"<<snpsize*genesize<<endl;
-  cis.open(cisfile,ofstream::out|ofstream::app);
-  trans.open(transfile,ofstream::out|ofstream::app);
+  eqtl.open(eqtlfile,ofstream::out|ofstream::app);
   if(mychunk==0){
-    cis<<"SNP\tGene\tt-statLow\tt-statMed\tt-statHigh"<<endl;
-    trans<<"SNP\tGene\tt-statLow\tt-statMed\tt-statHigh"<<endl;
+    eqtl<<"SNP\tGene\tt-statLow\tt-statMed\tt-statHigh\tDistance"<<endl;
   }
   
   for(int i=0; i<snpsize; i++)
@@ -321,30 +327,22 @@ void CisTransOut (const double *quantilearray,const int snpstart,const int snpsi
 	  cor2=quantilearray[multindex(i,j,1,snpsize,genesize,zsize)];
 	  cor2=cordenom*(cor2/sqrt(1-(cor2*cor2)));
 	  cor3=quantilearray[multindex(i,j,2,snpsize,genesize,zsize)];
+	  cor3=cordenom*(cor3/sqrt(1-(cor3*cor3)));
 	  //	  cout<<snpnames[i]<<"-"<<genenames[j]<<": "<<fabs(worstcor)<<" "<<t_thresh<<endl;
 	  
-
 	  if(fabs(cor2)>t_thresh)
 	    {
-	      if(isCis(snparray,genearray,snpanno[dsnpnames[i]],geneanno[dgenenames[j]],cisdist))
-		{
-		  cis<<dsnpnames[i]<<"\t"<<dgenenames[j]<<"\t"<<cor1<<"\t"<<cor2<<"\t"<<cor3<<endl;
-		}
-	      else
-		{
-		  trans<<dsnpnames[i]<<"\t"<<dgenenames[j]<<"\t"<<cor1<<"\t"<<cor2<<"\t"<<cor3<<endl;
-		}
+	      cisdist = CisDist(snparray,genearray,snpanno[dsnpnames[i]],geneanno[dgenenames[j]]);
+	      eqtl<<dsnpnames[i]<<"\t"<<dgenenames[j]<<"\t"<<cor1<<"\t"<<cor2<<"\t"<<cor3<<"\t"<<cisdist<<endl;
+	      
 	    }
 	}
-    } 
-
+    }
+	    
   mkl_free(dsnpnames);
   mkl_free(dgenenames);
   prog.close();
-  trans.close();
-  cis.close();
-
-
+  eqtl.close();
 }
 
 

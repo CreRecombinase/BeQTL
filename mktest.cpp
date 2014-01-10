@@ -34,7 +34,7 @@ int main(int argc, char* argv[])
   
 
   //file parameters
-  char *snpgenefilename,*annofilename,*tcisfilename,*ttransfilename,*tprogfilename;
+  char *snpgenefilename,*annofilename,*teqtlfilename,*tprogfilename;
   
 
 
@@ -67,7 +67,6 @@ int main(int argc, char* argv[])
   int snpstart;
   int casestart=0;
   int genestart;
-  int cisdist;
   int bsi;
   int alignsize=64;
   int quantilechunks;
@@ -89,9 +88,7 @@ int main(int argc, char* argv[])
   file_id = H5Fopen(snpgenefilename,H5F_ACC_RDONLY,H5P_DEFAULT);
 
   err=err|readparam(file_id,"annofile",annofilename);
-  err=err|readparam(file_id,"cisfilename",tcisfilename);
-
-  err=err|readparam(file_id,"transfilename",ttransfilename);
+  err=err|readparam(file_id,"eqtlfilename",teqtlfilename);
   err=err|readparam(file_id,"progfile",tprogfilename);
   err=err|readparam(file_id,"snpchunks",snpchunks);
   err=err|readparam(file_id,"genechunks",genechunks);
@@ -107,7 +104,6 @@ int main(int argc, char* argv[])
   err=err|readparam(file_id,"geneabstotal",geneabstotal);
 
   err=err|readparam(file_id,"t_thresh",t_thresh);
-  err=err|readparam(file_id,"cisdist",cisdist);
   if(err<0){
     cerr<<"Parameter not successfully read!: "<<err<<endl;
     return(err);
@@ -161,14 +157,15 @@ int main(int argc, char* argv[])
       return(-1);
     }
   C[(C_dim/sizeof(double))-1]=0;
-  for(mychunk =chunkstart; mychunk<=lastchunk; mychunk++)
+  stringstream sss;
+  sss<<chunkstart;
+  string chunkstr=sss.str();
+  string progfilename=std::string(tprogfilename)+std::string(chunkstr)+".txt";
+  string eqtlfilename=std::string(teqtlfilename)+std::string(chunkstr)+".txt";
+  for(mychunk =chunkstart; mychunk<lastchunk; mychunk++)
     {
-      stringstream sss;
-      sss<<mychunk;
-      string chunkstr=sss.str();
-      string progfilename=string(tprogfilename)+std::string(chunkstr)+".txt";
-      string cisfilename=string(tcisfilename)+std::string(chunkstr)+".txt";
-      string transfilename=string(ttransfilename)+std::string(chunkstr)+".txt";
+
+
      
       if(mychunk>snpchunks*genechunks)
 	{
@@ -257,9 +254,9 @@ int main(int argc, char* argv[])
       //cout<<"Writing quantiles to "<<corfilename<<endl;
       //WriteQuantiles(corfilename,tquantile,snpstart,snpsize,genestart,genesize,mychunk,writefilelock,snpgenefilename);
       s_elapsed_quant+=dsecnd()-s_initial_quant;
-      cout<<"Writing quantiles to file: "<<cisfilename<<endl;
+      cout<<"Writing quantiles to file: "<<eqtlfilename<<endl;
       s_initial_write=dsecnd();
-      CisTransOut(tquantile,snpstart,snpsize,genestart,genesize,casesize,3,annofilename,t_thresh,cisfilename.c_str(),transfilename.c_str(),cisdist,mychunk,progfilename.c_str(),snpanno,geneanno,snpannoarray,geneannoarray,snpgenefilename);
+      CisTransOut(tquantile,snpstart,snpsize,genestart,genesize,casesize,3,annofilename,t_thresh,eqtlfilename.c_str(),mychunk,progfilename.c_str(),snpanno,geneanno,snpannoarray,geneannoarray,snpgenefilename);
       s_elapsed_write+=dsecnd()-s_initial_write;
       cout<<"Read time: "<<s_elapsed_read<<endl;
       cout<<"Bootstrap time: "<<s_elapsed_boot<<endl;
