@@ -20,7 +20,7 @@ int main()
   char snpannofile[]="/home/nwk2/mkl_test/snpanno.txt";
   char geneannofile[]="/home/nwk2/mkl_test/geneanno.txt";
 
-  char outsnpfile[]="/scratch/nwk2/hdf5/snpgeneanno.h5";
+  char outsnpfile[]="/home/nwk2/mkl_test/snpgeneanno.h5";
 
   
   int snpsize=906598;
@@ -110,7 +110,7 @@ int main()
   for(int i=0;i<genesize;i++)
     {
       annofile>>tstring>>genearray[index(i,0,gene_colsize)]>>genearray[index(i,1,gene_colsize)]>>genearray[index(i,2,gene_colsize)];
-      genename[i]=(char*)malloc(tstring.length()+1*sizeof(char));
+      genename[i]=(char*)malloc((tstring.length()+1)*sizeof(char));
       strcpy(genename[i],tstring.c_str());
       //cout<<genename[i]<<"\t"<<genearray[index(i,0,gene_colsize)]<<"\t"<<genearray[index(i,1,gene_colsize)]<<"\t"<<genearray[index(i,2,gene_colsize)]<<endl;
     }

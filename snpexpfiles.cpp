@@ -157,7 +157,7 @@ int main(int argc, char* argv[])
   int bsi,snpchunks,genechunks,cisdist;
   int snpsize,genesize;
   double t_thresh;
-  char *snpfile,*genefile,*snpexph5,*annofile,*cisfilename,*transfilename,**snpnames,**genenames,*progfile;
+  char *snpfile,*genefile,*snpexph5,*annofile,*eqtlfilename,**snpnames,**genenames,*progfile;
   int i,j;
 
   paramfile=argv[1];
@@ -171,8 +171,7 @@ int main(int argc, char* argv[])
   progfile=readfparam("progfile",paramfile);
   snpexph5=readfparam("h5file",paramfile);
   annofile=readfparam("annofile",paramfile);
-  cisfilename=readfparam("cisfile",paramfile);
-  transfilename=readfparam("transfile",paramfile);
+  eqtlfilename=readfparam("eqtlfile",paramfile);
   snpchunks=atoi(readfparam("snpchunks",paramfile));
   genechunks=atoi(readfparam("genechunks",paramfile));
   casetotal=atoi(readfparam("casetotal",paramfile));
@@ -297,8 +296,7 @@ int main(int argc, char* argv[])
     readparam(file_id,"annofile",teststring);
     cout<<annofile<<endl;
     writeparameter(file_id,"progfile",progfile);
-    writeparameter(file_id,"cisfilename",cisfilename);
-    writeparameter(file_id,"transfilename",transfilename);
+    writeparameter(file_id,"eqtlfilename",eqtlfilename);
     writeparameter(file_id,"snpchunks",snpchunks);
     writeparameter(file_id,"genechunks",genechunks);
     writeparameter(file_id,"casetotal",casetotal);
