@@ -2,7 +2,7 @@
 #define MKTEST_HPP
 #include <math.h>
 #include "mkl.h"
-#include "strideiter.hpp"
+
 
 #include <algorithm>
 
