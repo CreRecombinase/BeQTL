@@ -9,6 +9,8 @@ directory <- arguments[1]
 resultfile <- arguments[2]
 
 eqtlfiles <- dir(directory,pattern="_eqtl")
+eqtlinfo <- file.info(eqtlfiles)
+eqtlfiles <- rownames(eqtlinfo)[eqtlinfo$size>0]
 
 alldata <- ldply(eqtlfiles,read.table,sep="\t",header=F,stringsAsFactors=F)
 
