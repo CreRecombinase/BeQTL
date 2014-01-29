@@ -1,6 +1,6 @@
 #Script for finding distant and local eQTL
 #Usage Rscript locdist.R snpanno.rds geneanno.rds eqtl.rds 
-arguments <- commandArgs(trailingOnly=T)
+arguments <- commandArgs(trailingOnly=T)insta
 
 snpAnno <- readRDS(arguments[1])
 geneAnno <- readRDS(arguments[2])
