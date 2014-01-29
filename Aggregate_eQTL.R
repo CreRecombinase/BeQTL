@@ -8,7 +8,7 @@ arguments <- commandArgs(trailingOnly=T)
 directory <- arguments[1]
 resultfile <- arguments[2]
 
-eqtlfiles <- dir(directory,pattern="_eqtl")
+eqtlfiles <- dir(directory,pattern="eqtl.+txt")
 eqtlinfo <- file.info(eqtlfiles)
 eqtlfiles <- rownames(eqtlinfo)[eqtlinfo$size>0]
 
