@@ -167,7 +167,7 @@ int main(int argc, char* argv[])
 
 
      
-      if(mychunk>snpchunks*genechunks)
+      if(mychunk>=snpchunks*genechunks)
 	{
 	  cout<<"eQTL analysis complete!"<<endl;
 	  return(0);
