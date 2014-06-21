@@ -8,7 +8,7 @@
 
 int main()
 {
-  int i, status;
+  int i, status,j;
   VSLSSTaskPtr task;
   float x[DIM*N]; //matrix of observations
   float q_order[M],quants[M];
@@ -24,12 +24,20 @@ int main()
   xstorage = VSL_SS_MATRIX_STORAGE_ROWS;
   params = EPS;
   nparams = VSL_SS_SQUANTS_ZW_PARAMS_N;
- 
+  for(i=0; i<DIM; i++){
+    for(j=0; j<N; j++){
+      x[i*N+j]= i*N+j;
+      cout<<x[i*N+j]<<"\t";
+    }
+    cout<<"\n";
+  }
+  cout<<"---------\nq_order:"<<endl;
   // Calculate percentiles
   for( i=0; i< M; i++){
     q_order[i] = (float)i/(float)M;
+    cout<<q_order[i]<<"\t";
   }
-  
+  cout<<"\n-----"<<endl;
   // Create task
   status = vslsSSNewTask( &task, &p, &n, &xstorage, x, 0, indices);
 
@@ -43,6 +51,9 @@ int main()
 
   //Deallocate the task resources 
   status = vslSSDeleteTask( &task);
+  for(i=0; i<M; i++){
+    cout<<quants[i]<<"\t";
+  }
   
   return(0);
 }
