@@ -10,7 +10,7 @@ int main()
 {
   int i, status;
   VSLSSTaskPtr task;
-  float x[DIM][N]; //matrix of observations
+  float x[DIM*N]; //matrix of observations
   float q_order[M],quants[M];
   float params;
   MKL_INT q_order_n;
