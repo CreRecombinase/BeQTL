@@ -1,5 +1,6 @@
 #include "mkl.h"
 #include <stdio.h>
+#include <iostream>
 using namespace std;
 #define DIM 3  //Dimension of the task
 #define N 1000 // Number of observations
