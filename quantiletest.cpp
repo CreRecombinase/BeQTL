@@ -1,4 +1,4 @@
-#include "mkl vsl.h"
+#include "mkl.h"
 #include <stdio.h>
 
 #define DIM 3  //Dimension of the task
