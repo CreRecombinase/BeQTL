@@ -42,12 +42,12 @@ int main()
   // Create task
   status = vslsSSNewTask( &task, &p, &n, &xstorage, x, 0, indices);
 
-  status = vslsSSEditStreamQuantiles(task,&q_order_n,q_order,
+  status = vslsSSEditQuantiles(task,&q_order_n,q_order,
 				     quants,&nparams,&params);
 
   //Compute percentile with accuracy eps
 
-  status = vslsSSCompute (task,VSL_SS_STREAM_QUANTS, 
+  status = vslsSSCompute(task,VSL_SS_STREAM_QUANTS, 
 			  VSL_SS_METHOD_SQUANTS_ZW);
 
   //Deallocate the task resources 
@@ -55,6 +55,7 @@ int main()
   for(i=0; i<M; i++){
     cout<<quants[i]<<"\t";
   }
+  
   
   return(0);
 }
