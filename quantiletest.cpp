@@ -4,6 +4,7 @@
 #define DIM 3  //Dimension of the task
 #define N 1000 // Number of observations
 #define M 100 //accuracy of quantile computation
+#define EPS 0.01
 
 int main()
 {
