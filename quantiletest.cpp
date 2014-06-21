@@ -1,6 +1,6 @@
 #include "mkl.h"
 #include <stdio.h>
-
+using namespace std;
 #define DIM 3  //Dimension of the task
 #define N 1000 // Number of observations
 #define M 100 //accuracy of quantile computation
