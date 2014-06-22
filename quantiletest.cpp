@@ -4,7 +4,7 @@
 using namespace std;
 #define DIM 3  //Dimension of the task
 #define N 4 // Number of observations
-#define M 100 //accuracy of quantile computation
+#define M 3 //accuracy of quantile computation
 #define EPS 0.01
 
 int main()
@@ -21,7 +21,7 @@ int main()
 
   p = DIM;
   n = N;
-  q_order_n = 3;
+  q_order_n = M;
   xstorage = VSL_SS_MATRIX_STORAGE_ROWS;
   params = EPS;
   nparams = VSL_SS_SQUANTS_ZW_PARAMS_N;
