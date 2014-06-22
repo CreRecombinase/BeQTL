@@ -21,7 +21,7 @@ int main()
 
   p = DIM;
   n = N;
-  q_order_n = M;
+  q_order_n = 3;
   xstorage = VSL_SS_MATRIX_STORAGE_ROWS;
   params = EPS;
   nparams = VSL_SS_SQUANTS_ZW_PARAMS_N;
@@ -34,20 +34,22 @@ int main()
   }
   cout<<"---------\nq_order:"<<endl;
   // Calculate percentiles
+  q_order[0] = 0.025;
+  q_order[1] = 0.5;
+  q_order[2] = 0.975;
   for( i=0; i< M; i++){
-    q_order[i] = (float)i/(float)M;
     cout<<q_order[i]<<"\t";
   }
   cout<<"\n-----"<<endl;
   // Create task
   status = vslsSSNewTask( &task, &p, &n, &xstorage, x, 0, indices);
 
-  status = vslsSSEditQuantiles(task,&q_order_n,q_order,
+  status = vslsSSEditStreamQuantiles(task,&q_order_n,q_order,
 				     quants,&nparams,&params);
 
   //Compute percentile with accuracy eps
 
-  status = vslsSSCompute(task,VSL_SS_STREAM_QUANTS, 
+  status = vslsSSCompute (task,VSL_SS_STREAM_QUANTS, 
 			  VSL_SS_METHOD_SQUANTS_ZW);
 
   //Deallocate the task resources 
@@ -55,7 +57,6 @@ int main()
   for(i=0; i<M; i++){
     cout<<quants[i]<<"\t";
   }
-  
   
   return(0);
 }
