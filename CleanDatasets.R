@@ -1,5 +1,6 @@
 library(sqldf)
 #usage CleanDatasets.R type oldir annodir newdir snpcut genecut paramfile JobsizeInGB
+oargs <- list(type="test",oldir="testdata/",annodir="testdata/",newdir="testdata/newtest/",snpcut=0,genecut=0,paramfile="testparam.txt",GB=1)
 oargs <- commandArgs(trailingOnly=T)
 args <- list()
 
