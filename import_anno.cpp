@@ -20,6 +20,10 @@ int main(int argc, char* argv[])
 
   char* snpannofile,*geneannofile,*outsnpfile;
   int snpsize,genesize;
+  if(argc <5){
+    cerr <"usage import_anno snpannofile geneannofile outsnpfile genesize snpsize"<<endl;
+    return(-1);
+  }
   snpannofile = argv[1];
   geneannofile = argv[2];
   outsnpfile = argv[3];
