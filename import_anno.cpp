@@ -15,16 +15,24 @@ int index (int i, int j, int M)
   return((M*i)+j);
 }
 
-int main()
+int main(int argc, char* argv[])
 {
+
+  char* snpannofile,geneannofile,outsnpfile;
+  int snpsize,genesize;
+  snpannofile = argv[1];
+  geneannofile = argv[2];
+  outsnpfile = argv[3];
+  genesize = atoi(argv[4]);
+  snpsize = atoi(argv[5]);
+
+
   char snpannofile[]="/home/nwk2/mkl_test/snpanno.txt";
   char geneannofile[]="/home/nwk2/mkl_test/geneanno.txt";
 
   char outsnpfile[]="/home/nwk2/mkl_test/snpgeneanno.h5";
 
   
-  int snpsize=906598;
-  int genesize=20501;
   hsize_t snpnamedims[1]={snpsize};
   hsize_t genenamedims[1]={genesize};
   hid_t fstrtype;
