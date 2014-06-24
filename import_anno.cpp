@@ -18,7 +18,7 @@ int index (int i, int j, int M)
 int main(int argc, char* argv[])
 {
 
-  char* snpannofile,geneannofile,outsnpfile;
+  char* snpannofile,*geneannofile,*outsnpfile;
   int snpsize,genesize;
   snpannofile = argv[1];
   geneannofile = argv[2];
@@ -42,7 +42,7 @@ int main(int argc, char* argv[])
   hid_t genenamespace,genearrayspace;
   hid_t snpnamedset,snparraydset;
   hid_t genenamedset,genearraydset;
-  hsize_t snpdims[2],genedims[2];
+  hsize_t snpdims[2],genedims[2]; 
   herr_t status;
 
   char **snpname;
