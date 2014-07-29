@@ -1,44 +1,25 @@
 library(sqldf)
+library(jsonlite)
+
+
+t.final <- function(x,n,tests,adjp){
+  abs(p.adjust(pt(q = abs(x),df = n-2,lower.tail = F),method = "fdr",n = tests)-adjp)
+}
+
+
+
 #usage CleanDatasets.R type oldir annodir newdir snpcut genecut paramfile JobsizeInGB
-oargs <- list(type="test",oldir="testdata/",annodir="testdata/",newdir="testdata/newtest/",snpcut=0,genecut=0,paramfile="testparam.txt",GB=1)
-oargs <- commandArgs(trailingOnly=T)
 args <- list()
 
-args$type <- oargs[[1]]
-args$oldir <- oargs[[2]]
-args$annodir <- oargs[[3]]
-args$newdir <- oargs[[4]]
-args$snpcut <- as.numeric(oargs[[5]])
-args$genecut <- as.numeric(oargs[[6]])
-args$paramfile <- oargs[[7]]
-args$GB <- as.integer(oargs[[8]])
-
-args$SNPfile <- paste0(args$oldir,"snp_",args$type,".txt")
-args$GENEfile <- paste0(args$oldir,"seq_",args$type,".txt")
-
-args$SNPanno <- paste0(args$annodir,"snpanno.txt")
-args$Geneanno <- paste0(args$annodir,"geneanno.txt")
-
-args$NewSNPfile <- paste0(args$newdir,"snp_",args$type,".txt")
-args$NewGENEfile <- paste0(args$newdir,"seq_",args$type,".txt")
-args$h5file <- paste0(args$newdir,"snpgenemat_",args$type,".h5")
-args$annofile <- paste0(args$annodir,"snpgeneanno.h5")
-
-
-args$eqtlfile <- paste0(args$newdir,args$type,"_eqtl")
-args$statfile <- paste0(args$newdir,args$type,"stat")
-
-paste0(args)
+data <- fromJSON(commandArgs(trailingOnly=T)[[1]])
 
 paste0("Reading in snp file ",args$SNPfile)
-snpdata <- read.csv.sql(args$SNPfile,sep="\t",header=T,eol="\n")
+snpdata <- read.csv.sql(data$inputsnpfile,sep="\t",header=T,eol="\n")
 paste0("Reading in gene file ",args$GENEfile)
-genedata <- read.csv.sql(args$GENEfile,sep="\t",header=T,eol="\n")
+genedata <- read.csv.sql(data$inputexpfile,sep="\t",header=T,eol="\n")
 
 paste0("Reading in SNP anno ",args$SNPanno)
-snpanno <- read.csv.sql(args$SNPanno,sep="\t",header=F,eol="\n")
 paste0("Reading in gene anno ",args$Geneanno)
-geneanno <- read.csv.sql(args$Geneanno,sep="\t",header=F,eol="\n")
 
 
 snpdata <- snpdata[!duplicated(snpdata[,1]),]
@@ -61,11 +42,6 @@ snpdata <-  snpdata[,colnames(snpdata) %in% colnames(genedata)]
 paste0("subsetting genedata")
 genedata <- genedata[,colnames(snpdata)]
 
-snpanno <- snpanno[snpanno[,1] %in% rownames(snpdata),]
-geneanno <- geneanno[geneanno[,1] %in% rownames(genedata),]
-
-snpdata <- snpdata[snpanno[,1],]
-geneanno <- genedata[geneanno[,1],]
 
 snpcount <- apply(snpdata,1,function(x)sum(sort(tabulate(x+1),decreasing=T)[-1]))
 snpcount <- snpcount/ncol(snpdata)
@@ -86,6 +62,8 @@ snpchunks <- ceiling(snptotal/snpgenesize)
 genetotal <- nrow(genedata)
 genechunks <- ceiling(genetotal/snpgenesize)
 
+t_thresh <- optimize(t.final,c(0,50),tol=0.00001,df=ncol(genedata)-2,tests=genetotal,adjp=0.05))
+
 params <- c(snpfile=args$NewSNPfile,
             genefile=args$NewGENEfile,
             genecut=args$genecut,
@@ -101,11 +79,12 @@ params <- c(snpfile=args$NewSNPfile,
             snpsize=snpgenesize,
             genesize=snpgenesize,
             casetotal=ncol(genedata),
-            snpabstotal=906598,
-            geneabstotal=20501,
             bsi=bsi,
-            t_thresh=3.5,
-            cisdist="1000000")
+            t_thresh=t_thresh,
+            Streaming=args$Streaming,
+            quantilenum=length(args$quantilepoints),
+            quantilepoints=args$quantilepoints,
+            cisdist=args$cisdist)
 
 aparams <- paste(names(params),params,sep="=")
 
