@@ -13,13 +13,10 @@ args <- list()
 
 data <- fromJSON(commandArgs(trailingOnly=T)[[1]])
 
-paste0("Reading in snp file ",args$SNPfile)
+paste0("Reading in snp file ",data$inputsnpfile)
 snpdata <- read.csv.sql(data$inputsnpfile,sep="\t",header=T,eol="\n")
-paste0("Reading in gene file ",args$GENEfile)
-genedata <- read.csv.sql(data$inputexpfile,sep="\t",header=T,eol="\n")
-
-paste0("Reading in SNP anno ",args$SNPanno)
-paste0("Reading in gene anno ",args$Geneanno)
+paste0("Reading in gene file ",data$inputgenefile)
+genedata <- read.csv.sql(data$inputgenefile,sep="\t",header=T,eol="\n")
 
 
 snpdata <- snpdata[!duplicated(snpdata[,1]),]
@@ -46,32 +43,35 @@ genedata <- genedata[,colnames(snpdata)]
 snpcount <- apply(snpdata,1,function(x)sum(sort(tabulate(x+1),decreasing=T)[-1]))
 snpcount <- snpcount/ncol(snpdata)
 
-snpdata <- snpdata[snpcount>args$snpcut,]
+snpdata <- snpdata[snpcount>data$snpcut,]
 
 genecount <- apply(genedata,1,function(x)sum(x>0))
 genecount <- genecount/ncol(genedata);
 
-genedata <- genedata[genecount>args$genecut,]
+genedata <- genedata[genecount>data$genecut,]
 
 bsi <- ceiling(ncol(genedata)*log10(ncol(genedata)))
-snpgenesize <- ceiling(sqrt((1024^3*args$GB)/(bsi*8)))
-
+if(data$Streaming){
+  snpgenesize <- ceiling(sqrt((1024^3*data$GB)/8))
+}else{
+  snpgenesize <- ceiling(sqrt((1024^3*data$GB)/(bsi*8)))
+}
 snpgenesize <- floor(snpgenesize/64)*64
 snptotal <- nrow(snpdata)
 snpchunks <- ceiling(snptotal/snpgenesize)
 genetotal <- nrow(genedata)
 genechunks <- ceiling(genetotal/snpgenesize)
 
-t_thresh <- optimize(t.final,c(0,50),tol=0.00001,df=ncol(genedata)-2,tests=genetotal,adjp=0.05))
+t_thresh <- optimize(t.final,c(0,10),tol=0.00001,n=ncol(genedata),tests=genetotal,adjp=0.05,maximum=F)[["minimum"]]
 
-params <- c(snpfile=args$NewSNPfile,
-            genefile=args$NewGENEfile,
-            genecut=args$genecut,
-            snpcut=args$snpcut,
-            h5file=args$h5file,
-            annofile=args$annofile,
-            progfile=args$statfile,
-            eqtlfile=args$eqtlfile,
+params <- c(snpfile=data$outputsnpfile,
+            genefile=data$outputgenefile,
+            genecut=data$genecut,
+            snpcut=data$snpcut,
+            h5file=data$h5file,
+            annofile=data$annofile,
+            progfile=data$statfile,
+            eqtlfile=data$eqtlfile,
             snpchunks=snpchunks,
             genechunks=genechunks,
             snptotal=snptotal,
@@ -81,14 +81,14 @@ params <- c(snpfile=args$NewSNPfile,
             casetotal=ncol(genedata),
             bsi=bsi,
             t_thresh=t_thresh,
-            Streaming=args$Streaming,
-            quantilenum=length(args$quantilepoints),
-            quantilepoints=args$quantilepoints,
-            cisdist=args$cisdist)
+            Streaming=data$Streaming,
+            quantilenum=length(data$quantilepoints),
+            quantilepoints=data$quantilepoints,
+            cisdist=data$cisdist)
 
 aparams <- paste(names(params),params,sep="=")
 
-write(aparams,file=args$paramfile,sep="\n")
+write(aparams,file=data$outputfile,sep="\n")
 
 
                   
