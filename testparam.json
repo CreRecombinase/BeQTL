@@ -1,0 +1,15 @@
+{
+"outputfile":"/groups/becklab/BeQTL/BRCAN_Test/Streaming/streaming_BRCAN_param.txt",
+"inputsnpfile":"/groups/becklab/BeQTL/BRCAN_Test/snp_BRCAN.txt",
+"inputgenefile":"/groups/becklab/BeQTL/BRCAN_Test/seq_BRCAN.txt",
+"outputsnpfile":"/groups/becklab/BeQTL/BRCAN_Test/Streaming/snp_BRCAN.txt",
+"outputgenefile":"/groups/becklab/BeQTL/BRCAN_Test/Streaming/seq_BRCAN.txt",
+"genecut":0.15,
+"snpcut":0.15,
+"h5file":"/groups/becklab/BeQTL/BRCAN_Test/Streaming/Streaming_BRCAN.h5",
+"progfile":"/groups/becklab/BeQTL/BRCAN_Test/Streaming/Streaming_BRCAN_prog_",
+"eqtlfile":"/groups/becklab/BeQTL/BRCAN_Test/Streaming/Streaming_BRCAN_eqtl_",
+"cisdist":1000000,
+"Streaming":true,
+"quantilepoints":[0.025,0.5,0.975]
+}
