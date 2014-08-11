@@ -13,6 +13,7 @@ rownames(SNP_anno) <- SNP_anno$RS.ID
 SNP_anno$Cancer <- 0
 
 for(i in names(snpnumber)){
+  print(i)
   SNP_anno[allSNPdata[[i]],"Cancer"] <- bitwOr(snpnumber[[i]],SNP_anno[allSNPdata[[i]],"Cancer"])
 }
 
@@ -25,16 +26,12 @@ rownames(Gene_anno) <- Gene_anno$GeneName
 Gene_anno$Cancer <- 0
 
 for(i in names(snpnumber)){
+  print(i)
   Gene_anno[allGenedata[[i]],"Cancer"] <- bitwOr(snpnumber[[i]],Gene_anno[allGenedata[[i]],"Cancer"])
 }
 
-SNPcan <- matrix(0,nrow=nrow(SNP_anno),ncol=length(snpnumber))
-Genecan <- matrix(0,nrow=nrow(Gene_anno),ncol=length(snpnumber))
-rownames(SNPcan) <- rownames(SNP_anno)
-rownames(Genecan) <- rownames(Gene_anno)
-colnames(SNPcan) <- names(snpnumber)
-colnames(Genecan) <- names(snpnumber)
-
+SNP_anno$CisGenes <- 0
+Gene_anno$CisSNPs <- 0
 SNPcl <- split(SNP_anno[SNP_anno$Cancer!=0,],f = SNP_anno[SNP_anno$Cancer!=0,"Chromosome"])
 Genecl <- split(Gene_anno[Gene_anno$Cancer!=0,],f=Gene_anno[Gene_anno$Cancer!=0,"Chromosome"])
 
@@ -42,21 +39,11 @@ for(i in 1:length(SNPcl)){
   print(i)
   startmat <- outer(SNPcl[[i]][,"Position"],Genecl[[i]][,"StartPosition"],function(x,y)(abs(x-y)<1e6))
   stopmat <- outer(SNPcl[[i]][,"Position"],Genecl[[i]][,"StopPosition"],function(x,y)(abs(x-y)<1e6))
-  CancerMat <- outer(SNPcl[[i]][,"Cancer"],Genecl[[i]][,"Cancer"],bitwAnd)
-  CancerMat[!(startmat|stopmat)]<-0
-  
-  
-  CancCount <- sapply(snpnumber,function(x)matrix(bitwAnd(x,CancerMat)/x,nrow = nrow(CancerMat),ncol=ncol(CancerMat)))
-  for(j in 1:length(snpnumber)){
-    paste0("Inner Loop:" ,j)
-    SNPcan[SNPcl[[i]][,"RS.ID"],j] <- apply(CancerMat,1,function(x)sum(bitwAnd(snpnumber[j],x)/snpnumber[j]))
-    Genecan[Genecl[[i]][,"GeneName"],j] <- apply(CancerMat,2,function(x)sum(bitwAnd(snpnumber[j],x)/snpnumber[j]))
-  }
+  starmat <- startmat|stopmat
+  SNP_anno[SNPcl[[i]][,"RS.ID"],"CisGenes"] <- rowSums(startmat)
+  Gene_anno[Genecl[[i]][,"GeneName"],"CisSNPs"] <- colSums(startmat))
 }
 
-
-SNP_anno <- data.frame(SNP_anno,SNPcan,stringsAsFactors=F)
-Gene_anno <- data.frame(Gene_anno,Genecan,stringsAsFactors=F)
 saveRDS(SNP_anno,"/groups/becklab/BeQTL/SNP_anno_ct.rds")
 write.table(SNP_anno,"/groups/becklab/BeQTL/SNP_anno_ct.txt",sep="\t",col.names=T,row.names=F)
 saveRDS(Gene_anno,"/groups/becklab/BeQTL/Gene_anno_ct.rds")
