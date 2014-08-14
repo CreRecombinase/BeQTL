@@ -1,0 +1,12 @@
+CT	Cancer	CancerDesc	Cases	BSI	Genes	SNPs	hypotheses
+1	COAD	Colon Adenocarcinoma	208	483	18551	650553	12068408703
+2	GBM	Glioblastoma Multiforme	139	298	18727	639872	11982882944
+3	HNSC	Head and Neck Squamous Cell Carcinoma	319	799	18916	643209	12166941444
+4	KIRC	Kidney Renal Clear Cell Carcinoma	476	1275	19151	774700	14836279700
+5	LAML	Acute Myeloid Leukemia	111	228	18054	639894	11552646276
+6	LUSC	Lung Squamous Cell Carcinoma	206	477	19057	636742	12134392294
+7	OV	Ovarian Serous Cystadenocarcinoma	192	439	3584	638867	2289699328
+8	LUAD	Lung Adenocarcinoma	345	876	18853	638295	12033775635
+9	BRCAN	ER Negative Breast Invasive Carcinoma	177	398	19105	820050	15667055250
+10	BRCAP	ER Positive Breast Invasive Carcinoma	608	1693	18985	777321	14757439185
+11	UCEC	Uterine Corpus Endometrial Carcinoma	368	945	19640	799874	15709525360
